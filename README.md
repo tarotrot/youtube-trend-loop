@@ -51,13 +51,6 @@ GitHubリポジトリの「Actions」タブ → 「Daily YouTube Trend Report」
 以降は毎日 日本時間7:00(UTC 22:00)に自動実行されます。実行時刻を変えたい場合は
 `.github/workflows/daily_trends.yml` 内の `cron` の値を編集してください。
 
-## Loop Engineering としての設計ポイント(発表用メモ)
-
-- **①Prompt**: 「動画1本を3行以内で、タイトルの言い換えでなく中身がわかるように要約せよ」という明確なゴール条件を指示に含めている
-- **②Context**: YouTube APIから取得したタイトル・チャンネル名・説明文を要約のコンテキストとして渡している
-- **③Harness**: `summarize_video`(個別要約)と `analyze_overall_trend`(横断的な傾向分析)という2つの役割を分離したスキル構成にしている
-- **④Loop**: 要約が3行/150文字を超えていた場合、「長すぎる」というフィードバックを付けて自動的に1回だけ再生成させる自己改善ループを組み込んでいる(`summarize_video`関数内)
-
 ## カスタマイズ
 
 - `REGION_CODE`: トレンド取得地域(デフォルト`"JP"`)
