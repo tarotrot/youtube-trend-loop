@@ -25,7 +25,7 @@ from google.oauth2.service_account import Credentials
 REGION_CODE = "JP"          # トレンド取得地域
 MAX_RESULTS = 10            # 取得件数
 SHEET_NAME = "trends"       # スプレッドシートのシート名
-GEMINI_MODEL = "gemini-2.5-flash"   # 無料枠で使えるモデル
+GEMINI_MODEL = "gemini-3.5-flash-lite"   # 無料枠で使える最新の軽量モデル
 
 YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
