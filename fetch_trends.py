@@ -3,12 +3,12 @@ YouTube トレンド自動取得・要約・スプレッドシート反映スク
 
 【処理の流れ】
 1. YouTube Data API v3 でトレンド動画(TOP10)を取得
-2. Claude API で各動画を要約 + 全体傾向を分析(Loop: 品質評価→再生成)
+2. Gemini API(無料枠)で各動画を要約 + 全体傾向を分析(Loop: 品質評価→再生成)
 3. Google Sheets API でスプレッドシートに追記
 
 【必要な環境変数】(GitHub Actions の Secrets に設定する)
 - YOUTUBE_API_KEY       : YouTube Data API v3 のAPIキー
-- ANTHROPIC_API_KEY     : Claude APIキー
+- GEMINI_API_KEY        : Gemini APIキー(Google AI Studioで無料発行)
 - GOOGLE_SERVICE_ACCOUNT_JSON : Google サービスアカウントのJSON(文字列そのまま)
 - SPREADSHEET_ID        : 反映先スプレッドシートのID(URLの/d/と/editの間の文字列)
 """
@@ -25,10 +25,10 @@ from google.oauth2.service_account import Credentials
 REGION_CODE = "JP"          # トレンド取得地域
 MAX_RESULTS = 10            # 取得件数
 SHEET_NAME = "trends"       # スプレッドシートのシート名
-CLAUDE_MODEL = "claude-sonnet-4-6"
+GEMINI_MODEL = "gemini-2.5-flash"   # 無料枠で使えるモデル
 
 YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 GOOGLE_SERVICE_ACCOUNT_JSON = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
 SPREADSHEET_ID = os.environ["SPREADSHEET_ID"]
 
@@ -62,25 +62,26 @@ def fetch_trending_videos():
     return videos
 
 
-# ============ 2. Claude APIで要約(Loop: 自己評価付き) ============
-def call_claude(prompt: str) -> str:
+# ============ 2. Gemini APIで要約(Loop: 自己評価付き) ============
+def call_gemini(prompt: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     res = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
+        url,
+        headers={"content-type": "application/json"},
+        params={"key": GEMINI_API_KEY},
         json={
-            "model": CLAUDE_MODEL,
-            "max_tokens": 500,
-            "messages": [{"role": "user", "content": prompt}],
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": 500},
         },
         timeout=60,
     )
     res.raise_for_status()
     data = res.json()
-    return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    candidates = data.get("candidates", [])
+    if not candidates:
+        return ""
+    parts = candidates[0].get("content", {}).get("parts", [])
+    return "".join(p.get("text", "") for p in parts)
 
 
 def summarize_video(video: dict) -> str:
@@ -93,7 +94,7 @@ def summarize_video(video: dict) -> str:
 チャンネル: {video['channel']}
 説明文: {video['description']}
 """
-    summary = call_claude(prompt).strip()
+    summary = call_gemini(prompt).strip()
 
     # --- Loop: 品質チェック(3行超なら1回だけ書き直させる) ---
     if summary.count("\n") >= 3 or len(summary) > 200:
@@ -102,7 +103,7 @@ def summarize_video(video: dict) -> str:
 「{summary}」
 これを2〜3行、150文字以内に圧縮して書き直してください。要約文のみ出力してください。
 """
-        summary = call_claude(retry_prompt).strip()
+        summary = call_gemini(retry_prompt).strip()
 
     return summary
 
@@ -116,7 +117,7 @@ def analyze_overall_trend(videos: list, summaries: list) -> str:
 
 {joined}
 """
-    return call_claude(prompt).strip()
+    return call_gemini(prompt).strip()
 
 
 # ============ 3. Google Sheetsに反映 ============
@@ -155,7 +156,7 @@ def main():
     videos = fetch_trending_videos()
     print(f"   -> {len(videos)}件取得")
 
-    print("2. Claude APIで要約中...")
+    print("2. Gemini APIで要約中...")
     summaries = []
     for v in videos:
         s = summarize_video(v)

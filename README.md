@@ -1,6 +1,6 @@
 # YouTube トレンド自動要約 → スプレッドシート反映
 
-毎日自動でYouTubeトレンドを取得し、Claude APIで要約、Googleスプレッドシートに追記するシステムです。
+毎日自動でYouTubeトレンドを取得し、Gemini API(無料枠)で要約、Googleスプレッドシートに追記するシステムです。
 
 ## 全体構成
 
@@ -9,7 +9,7 @@ GitHub Actions(毎朝トリガー)
     ↓
 YouTube Data API v3(トレンド取得)
     ↓
-Claude API(要約 + 傾向分析、品質チェックのLoop付き)
+Gemini API(要約 + 傾向分析、品質チェックのLoop付き)
     ↓
 Google Sheets API(スプレッドシートに追記)
 ```
@@ -30,8 +30,9 @@ Google Sheets API(スプレッドシートに追記)
 ### 3. スプレッドシートIDの確認
 スプレッドシートのURLの `.../d/【ここがID】/edit` の部分をコピー
 
-### 4. Anthropic API キーの取得
-[Anthropic Console](https://console.anthropic.com/) でAPIキーを発行
+### 4. Gemini API キーの取得(無料)
+1. [Google AI Studio](https://aistudio.google.com/apikey) にアクセス
+2. 「Create API key」でキーを発行(無料枠で利用可能)
 
 ### 5. GitHubリポジトリの準備
 1. このフォルダの中身を新規GitHubリポジトリにpush
@@ -40,7 +41,7 @@ Google Sheets API(スプレッドシートに追記)
 | Secret名 | 値 |
 |---|---|
 | `YOUTUBE_API_KEY` | 手順1で取得したキー |
-| `ANTHROPIC_API_KEY` | 手順4で取得したキー |
+| `GEMINI_API_KEY` | 手順4で取得したキー |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | 手順2でダウンロードしたJSONファイルの中身をそのまま貼り付け |
 | `SPREADSHEET_ID` | 手順3で確認したID |
 
@@ -50,13 +51,6 @@ GitHubリポジトリの「Actions」タブ → 「Daily YouTube Trend Report」
 
 以降は毎日 日本時間7:00(UTC 22:00)に自動実行されます。実行時刻を変えたい場合は
 `.github/workflows/daily_trends.yml` 内の `cron` の値を編集してください。
-
-## Loop Engineering としての設計ポイント(発表用メモ)
-
-- **①Prompt**: 「動画1本を3行以内で、タイトルの言い換えでなく中身がわかるように要約せよ」という明確なゴール条件を指示に含めている
-- **②Context**: YouTube APIから取得したタイトル・チャンネル名・説明文を要約のコンテキストとして渡している
-- **③Harness**: `summarize_video`(個別要約)と `analyze_overall_trend`(横断的な傾向分析)という2つの役割を分離したスキル構成にしている
-- **④Loop**: 要約が3行/150文字を超えていた場合、「長すぎる」というフィードバックを付けて自動的に1回だけ再生成させる自己改善ループを組み込んでいる(`summarize_video`関数内)
 
 ## カスタマイズ
 
